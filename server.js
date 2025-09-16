@@ -1,44 +1,28 @@
 require("dotenv").config();
+const cookieParser = require("cookie-parser");
 const express = require("express");
-const {
-  connectCacheService,
-  cacheInstance,
-} = require("./src/services/cache.service");
+const connectDB = require("./src/config/db/db");
+const authRoutes = require("./src/routes/user.routes");
+const cacheClient = require("./src/services/cache.service");
+
+connectDB();
+
+cacheClient.on("connect", () => {
+  console.log("Redis connected successfully");
+});
+
+cacheClient.on("error", (error) => {
+  console.log("error in redis", error);
+});
 
 const app = express();
 
 app.use(express.json());
+app.use(cookieParser());
 
-connectCacheService();
+app.use("/api/auth", authRoutes);
 
 let PORT = process.env.PORT || 4500;
-
-app.post("/save-data", async (req, res) => {
-  try {
-    let { name, age, email } = req.body;
-
-    await cacheInstance.setEx("user", 60, JSON.stringify(req.body));
-
-    let savedUser = await cacheInstance.get("user");
-
-    if (!savedUser)
-      return res.status(400).json({
-        message: "Bad request",
-      });
-
-    let parsedUser = JSON.parse(savedUser);
-
-    return res.status(201).json({
-      message: "User saved in redis",
-      user: parsedUser,
-    });
-  } catch (error) {
-    console.log("error in save data Api->", error);
-    return res.status(500).json({
-      message: "Internal server error",
-    });
-  }
-});
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
